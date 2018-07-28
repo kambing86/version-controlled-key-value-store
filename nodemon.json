@@ -1,0 +1,12 @@
+{
+  "ext": "ts yml yaml js json graphql gql",
+  "execMap": {
+    "ts": "ts-node --typeCheck"
+  },
+  "ignore": [
+    ".git",
+    "node_modules/**",
+    "*.test.ts",
+    "*.test.js"
+  ]
+}
