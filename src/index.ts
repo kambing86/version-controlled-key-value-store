@@ -1,36 +1,55 @@
 import express from 'express';
 import bodyParser from 'body-parser';
-import {findLast} from 'lodash';
+import {keys, findLast} from 'lodash';
+import redis from 'redis';
+import {promisify} from 'util';
+
+const redisClient = redis.createClient({
+  host: 'redis'
+});
+const getAsync = promisify(redisClient.get).bind(redisClient);
+const setAsync = promisify(redisClient.set).bind(redisClient);
+
+const {USE_REDIS, SET_MULTI_VALUES} = process.env;
 
 const keyStore = {};
-const appendValue = (key, value, timestamp): void => {
-  const data = keyStore[key];
-  keyStore[key] = {
+const appendValue = async(key: string, value: string, timestamp: string): Promise<void> => {
+  // const data = keyStore[key];
+  // keyStore[key] = {
+  //   ...data,
+  //   [timestamp]: value,
+  // };
+  const data = JSON.parse(await getAsync(key));
+  await setAsync(key,  JSON.stringify({
     ...data,
     [timestamp]: value,
-  };
+  }));
 }
-const findValue = (key, timestamp): any | undefined => {
-  const data = keyStore[key];
+const findValue = async (key: string, timestamp: string): Promise<any | undefined> => {
+  // const data = keyStore[key];
+  const data = JSON.parse(await getAsync(key));
   if (data) {
-    return findLast(data, (_value, timestampKey) => (timestamp === undefined || timestamp >= timestampKey));
+    return findLast(data, (_value, timestampKey) => (timestamp === undefined || parseInt(timestamp) >= parseInt(timestampKey)));
   }
   return undefined;
 }
 
 const server = express();
 server.use(bodyParser.json());
-server.get('/object/:key', (req, res) => {
-  res.json({value: findValue(req.params.key, req.query.timestamp)});
+server.get('/object/:key', async (req, res) => {
+  res.json({value: await findValue(req.params.key, req.query.timestamp)});
 });
-server.post('/object', (req, res) => {
+server.post('/object', async (req, res) => {
   const timestamp = Date.now();
   const {body} = req;
   let count = 0;
   let returnData = {};
+  if (keys(body).length > 1 && SET_MULTI_VALUES === 'false') {
+    throw new Error('cannot set multiple value');
+  }
   for (const key in body) {
     const value = body[key];
-    appendValue(key, value, timestamp);
+    await appendValue(key, value, timestamp.toString());
     count++;
     if (count === 1) {
       returnData = {

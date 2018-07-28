@@ -1,0 +1,13 @@
+version: '3'
+services:
+  redis:
+    image: redis:4-alpine
+    ports:
+      - 6379:6379
+  service:
+    build: .
+    environment:
+      USE_REDIS: "true"
+      SET_MULTI_VALUES: "false"
+    ports:
+      - 8080:8080

@@ -1,0 +1,9 @@
+node_modules
+lib
+.editorconfig
+.env
+.gitignore
+.prettierrc.yaml
+docker-compose.yaml
+nodemon.json
+tslint.yaml
