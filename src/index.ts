@@ -12,34 +12,15 @@ const redisClient = redis.createClient({
 const zaddAsync = promisify(redisClient.zadd).bind(redisClient);
 const zrevrangebyscoreAsync = promisify(redisClient.zrevrangebyscore).bind(redisClient);
 
-const {USE_REDIS, SET_MULTI_VALUES} = process.env;
+const {SET_MULTI_VALUES} = process.env;
 
-const keyStore = {};
 const appendValue = async (key: string, value: string, timestamp: string): Promise<void> => {
-  if (USE_REDIS) {
-    await zaddAsync(key, timestamp, JSON.stringify(value));
-  } else {
-    const data = keyStore[key];
-    keyStore[key] = {
-      ...data,
-      [timestamp]: value,
-    };
-  }
+  await zaddAsync(key, timestamp, JSON.stringify(value));
 };
 const findValue = async (key: string, timestamp: string): Promise<any | undefined> => {
-  if (USE_REDIS) {
-    const ary = await zrevrangebyscoreAsync(key, timestamp || '+inf', '-inf', 'LIMIT', 0, 1);
-    if (ary.length === 1) {
-      return JSON.parse(ary[0]);
-    }
-  } else {
-    const data = keyStore[key];
-    if (data) {
-      return findLast(
-        data,
-        (_value, timestampKey) => timestamp === undefined || parseInt(timestamp, 10) >= parseInt(timestampKey, 10),
-      );
-    }
+  const ary = await zrevrangebyscoreAsync(key, timestamp || '+inf', '-inf', 'LIMIT', 0, 1);
+  if (ary.length === 1) {
+    return JSON.parse(ary[0]);
   }
   return undefined;
 };

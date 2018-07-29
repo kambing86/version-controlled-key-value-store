@@ -7,7 +7,6 @@ services:
   service:
     build: .
     environment:
-      USE_REDIS: "true"
       SET_MULTI_VALUES: "true"
     ports:
       - 8080:8080
