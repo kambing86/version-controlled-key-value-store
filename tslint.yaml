@@ -2,7 +2,6 @@ defaultSeverity: error
 extends:
   - tslint:recommended
   - tslint-config-prettier # used to disable formatting rules (done by prettier)
-  - tslint-no-unused-expression-chai
 rules:
   max-line-length: # prettier doesn't handle long string
     - true
@@ -19,7 +18,7 @@ rules:
     - check-format
     - allow-leading-underscore
     - allow-pascal-case
-  # tsling-microsoft-contrib configuration
+  # tslint-microsoft-contrib configuration
   chai-vague-errors: true
   import-name:
     - false

@@ -1,6 +1,6 @@
 FROM node:10-alpine
 WORKDIR /app
-RUN npm install yarn@1.6.0 -g && chown -R node /app
+RUN npm install yarn@1.9.2 -g && chown -R node /app
 USER node
 COPY package.json yarn.lock ./
 RUN yarn install --pure-lockfile
