@@ -1,7 +1,7 @@
 import bodyParser from 'body-parser';
 import express from 'express';
 import http from 'http';
-import {findLast, forIn, keys} from 'lodash';
+import {forIn, keys} from 'lodash';
 import redis from 'redis';
 import ServerShutdown from 'server-shutdown';
 import {promisify} from 'util';
@@ -15,12 +15,16 @@ const zrevrangebyscoreAsync = promisify(redisClient.zrevrangebyscore).bind(redis
 const {SET_MULTI_VALUES} = process.env;
 
 const appendValue = async (key: string, value: string, timestamp: string): Promise<void> => {
-  await zaddAsync(key, timestamp, JSON.stringify(value));
+  await zaddAsync(key, timestamp, `${timestamp},${JSON.stringify(value)}`);
 };
 const findValue = async (key: string, timestamp: string): Promise<any | undefined> => {
   const ary = await zrevrangebyscoreAsync(key, timestamp || '+inf', '-inf', 'LIMIT', 0, 1);
   if (ary.length === 1) {
-    return JSON.parse(ary[0]);
+    const matches = /^\d+,(.+)$/ig.exec(ary[0]);
+    if (matches) {
+      const [, matchGroup] = matches;
+      return JSON.parse(matchGroup);
+    }
   }
   return undefined;
 };
