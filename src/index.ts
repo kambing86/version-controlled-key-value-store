@@ -9,22 +9,15 @@ import {promisify} from 'util';
 const redisClient = redis.createClient({
   host: 'redis',
 });
-const getAsync = promisify(redisClient.get).bind(redisClient);
-const setAsync = promisify(redisClient.set).bind(redisClient);
+const zaddAsync = promisify(redisClient.zadd).bind(redisClient);
+const zrevrangebyscoreAsync = promisify(redisClient.zrevrangebyscore).bind(redisClient);
 
 const {USE_REDIS, SET_MULTI_VALUES} = process.env;
 
 const keyStore = {};
 const appendValue = async (key: string, value: string, timestamp: string): Promise<void> => {
   if (USE_REDIS) {
-    const data = JSON.parse(await getAsync(key));
-    await setAsync(
-      key,
-      JSON.stringify({
-        ...data,
-        [timestamp]: value,
-      }),
-    );
+    await zaddAsync(key, timestamp, JSON.stringify(value));
   } else {
     const data = keyStore[key];
     keyStore[key] = {
@@ -34,17 +27,19 @@ const appendValue = async (key: string, value: string, timestamp: string): Promi
   }
 };
 const findValue = async (key: string, timestamp: string): Promise<any | undefined> => {
-  let data: any;
   if (USE_REDIS) {
-    data = JSON.parse(await getAsync(key));
+    const ary = await zrevrangebyscoreAsync(key, timestamp || '+inf', '-inf', 'LIMIT', 0, 1);
+    if (ary.length === 1) {
+      return JSON.parse(ary[0]);
+    }
   } else {
-    data = keyStore[key];
-  }
-  if (data) {
-    return findLast(
-      data,
-      (_value, timestampKey) => timestamp === undefined || parseInt(timestamp, 10) >= parseInt(timestampKey, 10),
-    );
+    const data = keyStore[key];
+    if (data) {
+      return findLast(
+        data,
+        (_value, timestampKey) => timestamp === undefined || parseInt(timestamp, 10) >= parseInt(timestampKey, 10),
+      );
+    }
   }
   return undefined;
 };
@@ -62,7 +57,11 @@ app.post('/object', async (req, res) => {
   const {body} = req;
   let count = 0;
   let returnData = {};
-  if (keys(body).length > 1 && SET_MULTI_VALUES === 'false') {
+  const totalKeys = keys(body);
+  if (totalKeys.length === 0) {
+    throw new Error('no value');
+  }
+  if (totalKeys.length > 1 && SET_MULTI_VALUES === 'false') {
     throw new Error('cannot set multiple value');
   }
   const allPromises: any[] = [];
@@ -76,9 +75,6 @@ app.post('/object', async (req, res) => {
       };
     }
   });
-  if (count === 0) {
-    throw new Error('no value');
-  }
   if (count > 1) {
     returnData = {
       ...body,
