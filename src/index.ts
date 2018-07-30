@@ -5,6 +5,7 @@ import {forIn, keys} from 'lodash';
 import redis from 'redis';
 import ServerShutdown from 'server-shutdown';
 import {promisify} from 'util';
+import {appendValue, findValue} from './core';
 
 const redisClient = redis.createClient({
   host: 'redis',
@@ -14,28 +15,13 @@ const zrevrangebyscoreAsync = promisify(redisClient.zrevrangebyscore).bind(redis
 
 const {SET_MULTI_VALUES} = process.env;
 
-const appendValue = async (key: string, value: string, timestamp: string): Promise<void> => {
-  await zaddAsync(key, timestamp, `${timestamp},${JSON.stringify(value)}`);
-};
-const findValue = async (key: string, timestamp: string): Promise<any | undefined> => {
-  const ary = await zrevrangebyscoreAsync(key, timestamp || '+inf', '-inf', 'LIMIT', 0, 1);
-  if (ary.length === 1) {
-    const matches = /^\d+,(.+)$/ig.exec(ary[0]);
-    if (matches) {
-      const [, matchGroup] = matches;
-      return JSON.parse(matchGroup);
-    }
-  }
-  return undefined;
-};
-
 const app = express();
 const httpServer = http.createServer(app);
 const serverShutdown = new ServerShutdown();
 
 app.use(bodyParser.json());
 app.get('/object/:key', async (req, res) => {
-  res.json({value: await findValue(req.params.key, req.query.timestamp)});
+  res.json({value: await findValue(req.params.key, req.query.timestamp, zrevrangebyscoreAsync)});
 });
 app.post('/object', async (req, res) => {
   const timestamp = Date.now();
@@ -51,7 +37,7 @@ app.post('/object', async (req, res) => {
   }
   const allPromises: any[] = [];
   forIn(body, (value, key) => {
-    allPromises.push(appendValue(key, value, timestamp.toString()));
+    allPromises.push(appendValue(key, value, timestamp.toString(), zaddAsync));
     count = count + 1;
     if (count === 1) {
       returnData = {

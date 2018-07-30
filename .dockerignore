@@ -7,3 +7,4 @@ lib
 docker-compose.yaml
 nodemon.json
 tslint.yaml
+test
